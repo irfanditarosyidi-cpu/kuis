@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "@firebase/auth";
 import { onValue, push, ref, set, update } from "@firebase/database";
+import { QRCodeCanvas } from "qrcode.react";
 import {
   Activity, AlertTriangle, ArrowLeft, BarChart3, BookOpen, BookOpenCheck, CheckCircle2,
   ChevronDown, ChevronUp, ClipboardList, Clock3, Copy, Edit3, ExternalLink, FileQuestion,
   FileSpreadsheet, Download, LayoutDashboard, Link2, ListChecks, LoaderCircle, LogOut, Menu,
-  MoreVertical, Plus, RefreshCcw, Save, Settings2, Sparkles, Trash2, Trophy, UploadCloud,
+  MoreVertical, Plus, QrCode, RefreshCcw, Save, Settings2, Sparkles, Trash2, Trophy, UploadCloud,
   Users, X, XCircle, Presentation,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -41,7 +42,6 @@ function activityLabel(type: ActivityLog["type"]) {
 export default function TeacherPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [demo, setDemo] = useState(false);
   const [ready, setReady] = useState(false);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [allAttempts, setAllAttempts] = useState<Record<string, Record<string, Attempt>>>({});
@@ -51,14 +51,12 @@ export default function TeacherPage() {
   const [toast, setToast] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [view, setView] = useState<TeacherView>("dashboard");
-  const teacherId = user?.uid || (demo ? "demo-teacher" : "");
+  const teacherId = user?.uid || "";
 
   useEffect(() => onAuthStateChanged(auth, (current) => {
-    const isDemo = localStorage.getItem("ruangtuntas_demo") === "true";
     setUser(current);
-    setDemo(isDemo);
     setReady(true);
-    if (!current && !isDemo) router.replace("/login");
+    if (!current) router.replace("/login");
   }), [router]);
 
   useEffect(() => {
@@ -111,7 +109,6 @@ export default function TeacherPage() {
   const visibleQuizzes = view === "dashboard" ? quizzes.slice(0, 3) : quizzes;
 
   async function logout() {
-    localStorage.removeItem("ruangtuntas_demo");
     if (auth.currentUser) await signOut(auth);
     router.replace("/login");
   }
@@ -146,6 +143,7 @@ export default function TeacherPage() {
   }
 
   if (!ready) return <div className="status-page"><LoaderCircle className="spin" /></div>;
+  if (!user) return <div className="status-page"><LoaderCircle className="spin" /></div>;
   if (selected) return <>
     <QuizManager quiz={selected} tab={tab} setTab={setTab} onBack={() => setSelectedId(null)} onEdit={() => setQuizModal(selected)} onToast={setToast} attempts={allAttempts[selected.id] || {}} />
     {quizModal && <QuizModal initial={quizModal === "new" ? null : quizModal} teacherId={teacherId} onClose={() => setQuizModal(null)} onSaved={(id) => { setQuizModal(null); setSelectedId(id); setToast("Pengaturan kuis berhasil diperbarui"); }} />}
@@ -164,7 +162,7 @@ export default function TeacherPage() {
         <div className="sidebar-bottom">
           <div className="teacher-profile">
             <div className="avatar">{(user?.email || "G")[0].toUpperCase()}</div>
-            <div><strong>{demo ? "Guru Demo" : user?.displayName || "Guru"}</strong><span>{demo ? "Mode demonstrasi" : user?.email}</span></div>
+            <div><strong>{user.displayName || "Guru"}</strong><span>{user.email}</span></div>
           </div>
           <button className="nav-button" onClick={logout}><LogOut size={17} />Keluar</button>
         </div>
@@ -175,7 +173,7 @@ export default function TeacherPage() {
           <div className="topbar-copy">
             <button className="icon-btn mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Buka menu"><Menu size={20} /></button>
             <p className="eyebrow">{view === "dashboard" ? "Ringkasan hari ini" : "Manajemen asesmen"}</p>
-            <h1 className="title">{view === "dashboard" ? `Selamat mengajar, ${demo ? "Bu Guru" : (user?.displayName?.split(" ")[0] || "Guru")}.` : "Kuis saya"}</h1>
+            <h1 className="title">{view === "dashboard" ? `Selamat mengajar, ${user.displayName?.split(" ")[0] || "Guru"}.` : "Kuis saya"}</h1>
             <p>{view === "dashboard" ? "Setiap hasil adalah awal dari langkah belajar berikutnya." : "Buat, atur, dan pantau seluruh kuis Anda di satu tempat."}</p>
           </div>
           <div className="top-actions"><button className="btn btn-primary" onClick={() => setQuizModal("new")}><Plus size={18} /><span>Buat Kuis</span></button></div>
@@ -274,7 +272,7 @@ function QuizManager({ quiz, tab, setTab, onBack, onEdit, onToast, attempts }: {
       {tab === "info" && <InfoTab quiz={quiz} questionCount={questions.length} copyLink={copyLink} setStatus={setStatus} />}
       {tab === "questions" && <section><div className="section-head"><div><h2 className="section-title">Daftar soal</h2><p className="muted small">Kunci jawaban hanya tersimpan pada node privat.</p></div><div className="question-head-actions"><button className="btn btn-outline" onClick={() => setImportModal(true)}><UploadCloud size={17} />Impor Excel</button><button className="btn btn-primary" onClick={() => setQuestionModal("new")}><Plus size={17} />Tambah soal</button></div></div><div className="question-list">{questions.map((q, index) => <div className="card question-row" key={q.id}><div className="question-number">{index + 1}</div><div><h4>{q.text}</h4><p className="muted small">Jawaban: <strong>{q.correctAnswer}</strong> · Bobot {q.weight}</p></div><div className="row-actions"><button className="icon-btn" disabled={index === 0} onClick={() => moveQuestion(q, -1)}><ChevronUp size={15} /></button><button className="icon-btn" disabled={index === questions.length - 1} onClick={() => moveQuestion(q, 1)}><ChevronDown size={15} /></button><button className="icon-btn" onClick={() => setQuestionModal(q)}><Edit3 size={15} /></button><button className="icon-btn" onClick={() => deleteQuestion(q)}><Trash2 size={15} /></button></div></div>)}{!questions.length && <div className="card empty-state"><div><div className="empty-illustration"><ListChecks size={34} /></div><h3>Soal belum ditambahkan</h3><p className="muted">Tambahkan satu per satu atau impor banyak soal dari template Excel.</p><div style={{ display: "flex", gap: 9, justifyContent: "center", flexWrap: "wrap" }}><button className="btn btn-outline" onClick={() => setImportModal(true)}><UploadCloud size={17} />Impor Excel</button><button className="btn btn-primary" onClick={() => setQuestionModal("new")}><Plus size={17} />Tambah soal</button></div></div></div>}</div></section>}
       {tab === "monitor" && <Monitoring quiz={quiz} attempts={attempts} />}
-      {tab === "results" && <Results attempts={attempts} />}
+      {tab === "results" && <Results quizId={quiz.id} questions={questions} attempts={attempts} />}
     </main>
     {questionModal && <QuestionModal quiz={quiz} questions={questions} initial={questionModal === "new" ? null : questionModal} onClose={() => setQuestionModal(null)} onSaved={() => { setQuestionModal(null); onToast("Soal berhasil disimpan"); }} />}
     {importModal && <ExcelImportModal quiz={quiz} existingCount={questions.length} onClose={() => setImportModal(false)} onImported={(count) => { setImportModal(false); onToast(`${count} soal berhasil diimpor`); }} />}
@@ -282,8 +280,22 @@ function QuizManager({ quiz, tab, setTab, onBack, onEdit, onToast, attempts }: {
 }
 
 function InfoTab({ quiz, questionCount, copyLink, setStatus }: { quiz: Quiz; questionCount: number; copyLink: () => void; setStatus: (status: QuizStatus) => void }) {
-  const link = typeof window === "undefined" ? `/q/${quiz.accessToken}` : `${location.origin}/q/${quiz.accessToken}`;
-  return <div className="info-layout"><section className="card panel"><h3>Tautan akses siswa</h3><p className="muted small">Hanya siswa yang menerima tautan ini yang dapat membuka kuis.</p><div className="link-box">{link}</div><div style={{ display: "flex", gap: 9, marginTop: 12 }}><button className="btn btn-primary btn-sm" onClick={copyLink}><Copy size={15} />Salin tautan</button><a className="btn btn-outline btn-sm" href={link} target="_blank"><ExternalLink size={15} />Pratinjau</a></div><div style={{ marginTop: 27 }}><h3 style={{ marginBottom: 10 }}>Deskripsi untuk siswa</h3><p className="muted small" style={{ lineHeight: 1.7 }}>{quiz.description || "Belum ada deskripsi untuk kuis ini."}</p></div></section><aside className="card panel"><h3>Ketentuan kuis</h3><div className="setting-line"><span>Jumlah soal</span><strong>{questionCount}</strong></div><div className="setting-line"><span>Batas nilai</span><strong>{quiz.passingScore}</strong></div><div className="setting-line"><span>Durasi</span><strong>{quiz.durationMinutes ? `${quiz.durationMinutes} menit` : "Tanpa batas"}</strong></div><div className="setting-line"><span>Acak soal</span><strong>{quiz.shuffleQuestions ? "Ya" : "Tidak"}</strong></div><div className="setting-line"><span>Acak opsi</span><strong>{quiz.shuffleOptions ? "Ya" : "Tidak"}</strong></div><div className="status-controls">{quiz.status !== "active" && <button className="btn btn-primary" onClick={() => setStatus("active")}><CheckCircle2 size={17} />Aktifkan kuis</button>}{quiz.status === "active" && <button className="btn btn-danger" onClick={() => setStatus("closed")}><XCircle size={17} />Tutup kuis</button>}{quiz.status !== "draft" && <button className="btn btn-light" onClick={() => setStatus("draft")}>Kembalikan ke draft</button>}</div></aside></div>;
+  const [link, setLink] = useState(`/q/${quiz.accessToken}`);
+  const qrRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => setLink(`${window.location.origin}/q/${quiz.accessToken}`), [quiz.accessToken]);
+
+  function downloadQr() {
+    const canvas = qrRef.current?.querySelector("canvas");
+    if (!canvas) return;
+    const anchor = document.createElement("a");
+    const fileName = quiz.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "kuis";
+    anchor.download = `qr-${fileName}.png`;
+    anchor.href = canvas.toDataURL("image/png");
+    anchor.click();
+  }
+
+  return <div className="info-layout"><section className="card panel"><h3>Tautan akses siswa</h3><p className="muted small">Siswa dapat membuka tautan atau memindai QR berikut untuk masuk ke kuis.</p><div className="share-layout"><div className="share-link"><div className="link-box">{link}</div><div className="share-actions"><button className="btn btn-primary btn-sm" onClick={copyLink}><Copy size={15} />Salin tautan</button><a className="btn btn-outline btn-sm" href={link} target="_blank" rel="noreferrer"><ExternalLink size={15} />Pratinjau</a></div></div><div className="qr-card"><div className="qr-code" ref={qrRef}><QRCodeCanvas value={link} size={180} level="H" marginSize={2} title={`QR akses ${quiz.title}`} /></div><div className="qr-label"><QrCode size={15} /><span>Pindai untuk membuka kuis</span></div><button className="btn btn-light btn-sm qr-download" onClick={downloadQr}><Download size={15} />Unduh QR</button></div></div><div className="student-description"><h3>Deskripsi untuk siswa</h3><p className="muted small">{quiz.description || "Belum ada deskripsi untuk kuis ini."}</p></div></section><aside className="card panel"><h3>Ketentuan kuis</h3><div className="setting-line"><span>Jumlah soal</span><strong>{questionCount}</strong></div><div className="setting-line"><span>Batas nilai</span><strong>{quiz.passingScore}</strong></div><div className="setting-line"><span>Durasi</span><strong>{quiz.durationMinutes ? `${quiz.durationMinutes} menit` : "Tanpa batas"}</strong></div><div className="setting-line"><span>Acak soal</span><strong>{quiz.shuffleQuestions ? "Ya" : "Tidak"}</strong></div><div className="setting-line"><span>Acak opsi</span><strong>{quiz.shuffleOptions ? "Ya" : "Tidak"}</strong></div><div className="status-controls">{quiz.status !== "active" && <button className="btn btn-primary" onClick={() => setStatus("active")}><CheckCircle2 size={17} />Aktifkan kuis</button>}{quiz.status === "active" && <button className="btn btn-danger" onClick={() => setStatus("closed")}><XCircle size={17} />Tutup kuis</button>}{quiz.status !== "draft" && <button className="btn btn-light" onClick={() => setStatus("draft")}>Kembalikan ke draft</button>}</div></aside></div>;
 }
 
 function QuestionModal({ quiz, questions, initial, onClose, onSaved }: { quiz: Quiz; questions: Question[]; initial: Question | null; onClose: () => void; onSaved: () => void }) {
@@ -328,9 +340,29 @@ function ActivityModal({ quizId, attempt, onClose }: { quizId: string; attempt: 
   return <div className="overlay"><div className="modal"><div className="modal-head"><div><h2>Aktivitas {attempt.student.name}</h2><p className="muted small">Indikator aktivitas browser, bukan bukti mutlak kecurangan.</p></div><button className="icon-btn" onClick={onClose}><X size={18} /></button></div><div className="modal-body"><div className="log-list">{logs.map((log) => <div className="log-item" key={log.id}><span className="log-dot">{log.type === "page_return" ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}</span><div><strong className="small">{activityLabel(log.type)}</strong><div className="muted" style={{ fontSize: 11 }}>{log.type.replaceAll("_", " ")}</div></div><time className="muted small">{formatDate(log.timestamp)}</time></div>)}{!logs.length && <p className="muted small" style={{ textAlign: "center", padding: 25 }}>Belum ada aktivitas keluar halaman.</p>}</div></div></div></div>;
 }
 
-function Results({ attempts }: { attempts: Record<string, Attempt> }) {
+type SavedAnswer = { answer: AnswerKey; updatedAt: number };
+
+function Results({ quizId, questions, attempts }: { quizId: string; questions: Question[]; attempts: Record<string, Attempt> }) {
   const list = Object.entries(attempts).map(([id, value]) => ({ ...value, id })).filter((a) => a.status === "submitted").sort((a, b) => (b.score || 0) - (a.score || 0));
-  return <section><div className="section-head"><div><h2 className="section-title">Hasil pengerjaan</h2><p className="muted small">Nilai dan tindak lanjut dihitung otomatis saat siswa mengumpulkan.</p></div></div><div className="table-wrap"><table className="data-table"><thead><tr><th>Siswa</th><th>Kelas</th><th>Benar</th><th>Salah</th><th>Nilai</th><th>Tindak lanjut</th><th>Waktu submit</th></tr></thead><tbody>{list.map((attempt) => <tr key={attempt.id}><td><div className="student-name">{attempt.student.name}</div><span className="muted small">No. {attempt.student.attendanceNumber}</span></td><td>{attempt.student.className}</td><td>{attempt.correctCount ?? "—"}</td><td>{attempt.incorrectCount ?? "—"}</td><td><strong style={{ fontSize: 17 }}>{attempt.score}</strong></td><td><span className={`badge ${attempt.followUp === "REMEDIAL" ? "badge-remedial" : "badge-enrichment"}`}>{attempt.followUp}</span></td><td>{formatDate(attempt.submittedAt)}</td></tr>)}{!list.length && <tr><td colSpan={7} style={{ textAlign: "center", padding: 50 }}><BarChart3 size={29} style={{ color: "#97a198", marginBottom: 9 }} /><div className="muted">Hasil akan muncul setelah siswa mengumpulkan.</div></td></tr>}</tbody></table></div></section>;
+  const [detail, setDetail] = useState<Attempt | null>(null);
+  return <section><div className="section-head"><div><h2 className="section-title">Hasil pengerjaan</h2><p className="muted small">Nilai dan tindak lanjut dihitung otomatis saat siswa mengumpulkan.</p></div></div><div className="table-wrap"><table className="data-table"><thead><tr><th>Siswa</th><th>Kelas</th><th>Benar</th><th>Salah</th><th>Nilai</th><th>Tindak lanjut</th><th>Waktu submit</th><th /></tr></thead><tbody>{list.map((attempt) => <tr key={attempt.id}><td><div className="student-name">{attempt.student.name}</div><span className="muted small">No. {attempt.student.attendanceNumber}</span></td><td>{attempt.student.className}</td><td>{attempt.correctCount ?? "—"}</td><td>{attempt.incorrectCount ?? "—"}</td><td><strong style={{ fontSize: 17 }}>{attempt.score}</strong></td><td><span className={`badge ${attempt.followUp === "REMEDIAL" ? "badge-remedial" : "badge-enrichment"}`}>{attempt.followUp}</span></td><td>{formatDate(attempt.submittedAt)}</td><td><button className="btn btn-outline btn-sm" onClick={() => setDetail(attempt)}>Lihat jawaban</button></td></tr>)}{!list.length && <tr><td colSpan={8} style={{ textAlign: "center", padding: 50 }}><BarChart3 size={29} style={{ color: "#97a198", marginBottom: 9 }} /><div className="muted">Hasil akan muncul setelah siswa mengumpulkan.</div></td></tr>}</tbody></table></div>{detail && <AnswerDetailModal key={detail.id} quizId={quizId} questions={questions} attempt={detail} onClose={() => setDetail(null)} />}</section>;
+}
+
+function AnswerDetailModal({ quizId, questions, attempt, onClose }: { quizId: string; questions: Question[]; attempt: Attempt; onClose: () => void }) {
+  const [answers, setAnswers] = useState<Record<string, SavedAnswer>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => onValue(ref(database, `answers/${quizId}/${attempt.id}`), (snapshot) => {
+    setAnswers(snapshot.val() || {});
+    setLoading(false);
+  }), [quizId, attempt.id]);
+
+  return <div className="overlay"><div className="modal modal-wide answer-detail-modal"><div className="modal-head"><div><h2>Jawaban {attempt.student.name}</h2><p className="muted small">No. {attempt.student.attendanceNumber} · {attempt.student.className} · Dikumpulkan {formatDate(attempt.submittedAt)}</p></div><button className="icon-btn" onClick={onClose} aria-label="Tutup detail jawaban"><X size={18} /></button></div><div className="modal-body"><div className="answer-detail-summary"><div><span>Nilai akhir</span><strong>{attempt.score ?? "—"}</strong></div><div><span>Jawaban benar</span><strong>{attempt.correctCount ?? "—"}</strong></div><div><span>Jawaban salah</span><strong>{attempt.incorrectCount ?? "—"}</strong></div></div>{loading ? <div className="answer-detail-loading"><LoaderCircle className="spin" size={25} />Memuat jawaban…</div> : <div className="answer-detail-list">{questions.map((question, index) => {
+    const studentAnswer = answers[question.id]?.answer;
+    const correctAnswer = question.correctAnswer;
+    const state = !studentAnswer ? "unanswered" : studentAnswer === correctAnswer ? "correct" : "incorrect";
+    return <article className={`answer-review ${state}`} key={question.id}><div className="answer-review-head"><span className="answer-review-number">{index + 1}</span><div><h3>{question.text}</h3><span className="muted small">Bobot {question.weight}</span></div><span className={`answer-review-status ${state}`}>{state === "correct" ? <><CheckCircle2 size={15} />Benar</> : state === "incorrect" ? <><XCircle size={15} />Salah</> : <><AlertTriangle size={15} />Tidak dijawab</>}</span></div><div className="answer-review-choices"><div><span>Jawaban siswa</span>{studentAnswer ? <strong><i>{studentAnswer}</i>{question.options[studentAnswer] || "Pilihan tidak tersedia"}</strong> : <strong className="empty-answer">Tidak dijawab</strong>}</div><div><span>Kunci jawaban</span>{correctAnswer ? <strong><i>{correctAnswer}</i>{question.options[correctAnswer] || "Pilihan tidak tersedia"}</strong> : <strong className="empty-answer">Tidak tersedia</strong>}</div></div></article>;
+  })}{!questions.length && <div className="answer-detail-loading">Soal tidak tersedia.</div>}</div>}</div></div></div>;
 }
 
 type ImportedQuestion = {

@@ -15,6 +15,7 @@
     "@firebase/database": "^1.1.5",
     "lucide-react": "^1.52.0",
     "next": "^16.3.8",
+    "qrcode.react": "^4.2.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "read-excel-file": "^9.3.10",

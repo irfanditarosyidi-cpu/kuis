@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "@firebase/auth";
-import { BookOpenCheck, Eye, EyeOff, GraduationCap, LoaderCircle, Sparkles } from "lucide-react";
+import { BookOpenCheck, Eye, EyeOff, GraduationCap, LoaderCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
 
 export default function LoginPage() {
@@ -13,10 +13,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (localStorage.getItem("ruangtuntas_demo") === "true") router.replace("/teacher");
-  }, [router]);
 
   async function login(event: React.FormEvent) {
     event.preventDefault();
@@ -30,11 +26,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function enterDemo() {
-    localStorage.setItem("ruangtuntas_demo", "true");
-    router.push("/teacher");
   }
 
   return (
@@ -69,8 +60,6 @@ export default function LoginPage() {
             {error && <div className="error-box">{error}</div>}
             <button className="btn btn-primary login-submit" disabled={loading}>{loading ? <LoaderCircle className="spin" size={18} /> : <GraduationCap size={18} />}{loading ? "Memeriksa…" : "Masuk sebagai Guru"}</button>
           </form>
-          <div className="divider">atau lihat produknya sekarang</div>
-          <button className="btn btn-outline" style={{ width: "100%", minHeight: 47 }} onClick={enterDemo}><Sparkles size={17} />Coba dashboard demo</button>
           <p className="login-note">Siswa tidak perlu login — cukup buka tautan kuis dari guru.</p>
         </div>
       </section>

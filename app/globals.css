@@ -169,6 +169,17 @@ a { color: inherit; text-decoration: none; }
 .panel { padding: 22px; }
 .panel h3 { margin: 0 0 18px; font-size: 17px; }
 .link-box { padding: 12px; border: 1px dashed #b6c8df; border-radius: 12px; background: #f6f9fd; word-break: break-all; color: #3e506a; font-size: 13px; }
+.share-layout { display: grid; grid-template-columns: minmax(0, 1fr) 220px; align-items: start; gap: 20px; margin-top: 18px; }
+.share-link { min-width: 0; }
+.share-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 12px; }
+.qr-card { border: 1px solid #dfe7f1; border-radius: 16px; background: #f8fafd; padding: 13px; text-align: center; }
+.qr-code { display: grid; place-items: center; padding: 7px; border-radius: 11px; background: white; }
+.qr-code canvas { display: block; width: 100% !important; height: auto !important; aspect-ratio: 1; }
+.qr-label { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 10px 0; color: #637085; font-size: 11px; font-weight: 700; }
+.qr-download { width: 100%; }
+.student-description { margin-top: 27px; }
+.student-description h3 { margin-bottom: 10px; }
+.student-description p { margin: 0; line-height: 1.7; }
 .setting-line { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid #edf0eb; font-size: 13px; }
 .setting-line:last-child { border: 0; }
 .setting-line span { color: var(--muted); }
@@ -199,6 +210,31 @@ a { color: inherit; text-decoration: none; }
 .log-list { display: grid; gap: 0; }
 .log-item { display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .log-dot { width: 29px; height: 29px; border-radius: 9px; display: grid; place-items: center; background: #f8e9d5; color: #a25d24; }
+.answer-detail-modal { width: min(940px, 100%); }
+.answer-detail-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; margin-bottom: 19px; }
+.answer-detail-summary > div { padding: 14px 16px; border: 1px solid #e1e8f0; border-radius: 13px; background: #f7f9fc; }
+.answer-detail-summary span, .answer-detail-summary strong { display: block; }
+.answer-detail-summary span { color: var(--muted); font-size: 11px; }
+.answer-detail-summary strong { margin-top: 4px; font-size: 21px; }
+.answer-detail-loading { min-height: 180px; display: flex; align-items: center; justify-content: center; gap: 9px; color: var(--muted); font-size: 13px; }
+.answer-detail-list { display: grid; gap: 12px; }
+.answer-review { padding: 17px; border: 1px solid #e1e7ef; border-left: 4px solid #a7b1bf; border-radius: 14px; background: white; }
+.answer-review.correct { border-left-color: #2f8a64; }
+.answer-review.incorrect { border-left-color: #c55447; }
+.answer-review.unanswered { border-left-color: #c28a36; }
+.answer-review-head { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: start; gap: 11px; }
+.answer-review-number { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 9px; background: #edf2f8; color: #53647a; font-size: 12px; font-weight: 850; }
+.answer-review-head h3 { margin: 2px 0 5px; font-size: 14px; line-height: 1.45; }
+.answer-review-status { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; border-radius: 20px; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.answer-review-status.correct { color: #216c4e; background: #e5f5ed; }
+.answer-review-status.incorrect { color: #a33f35; background: #fae9e6; }
+.answer-review-status.unanswered { color: #91601f; background: #fff1dd; }
+.answer-review-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0 0 45px; }
+.answer-review-choices > div { padding: 11px 12px; border-radius: 10px; background: #f7f9fc; }
+.answer-review-choices span { display: block; margin-bottom: 6px; color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .035em; }
+.answer-review-choices strong { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; line-height: 1.45; }
+.answer-review-choices i { flex: 0 0 23px; width: 23px; height: 23px; display: grid; place-items: center; border-radius: 7px; background: #e7edf5; color: #43546a; font-size: 10px; font-style: normal; }
+.answer-review-choices .empty-answer { color: var(--muted); font-weight: 600; }
 .import-guide { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 0 2px 16px; }
 .import-guide strong { font-size: 14px; }
 .import-guide p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
@@ -394,6 +430,7 @@ a { color: inherit; text-decoration: none; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .quiz-grid { grid-template-columns: 1fr; }
   .info-layout { grid-template-columns: 1fr; }
+  .share-layout { grid-template-columns: minmax(0, 1fr) 210px; }
   .access-card { grid-template-columns: 1fr; }
   .access-intro { min-height: 340px; }
   .quiz-layout { grid-template-columns: 1fr; }
@@ -425,6 +462,11 @@ a { color: inherit; text-decoration: none; }
   .overlay { padding: 0; }
   .editor-title-row { display: block; }
   .editor-title-row .btn { margin-top: 14px; }
+  .share-layout { grid-template-columns: 1fr; }
+  .qr-card { width: min(240px, 100%); }
+  .answer-review-head { grid-template-columns: 34px minmax(0, 1fr); }
+  .answer-review-status { grid-column: 2; justify-self: start; }
+  .answer-review-choices { grid-template-columns: 1fr; margin-left: 45px; }
   .summary-strip { grid-template-columns: 1fr 1fr; }
   .question-head-actions { width: 100%; justify-content: stretch; }
   .question-head-actions .btn { flex: 1; }
@@ -441,6 +483,8 @@ a { color: inherit; text-decoration: none; }
   .answer-letter { width: 34px; height: 34px; }
   .quiz-controls .btn span { display: none; }
   .result-body { padding: 0 20px 25px; }
+  .answer-detail-summary { grid-template-columns: 1fr; }
+  .answer-review-choices { margin-left: 0; }
   .projector-grid { grid-template-columns: 1fr; }
   .projector-stats { gap: 8px; }
   .projector-stats > div { padding: 11px; }

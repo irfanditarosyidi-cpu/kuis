@@ -11,14 +11,13 @@ npm install
 npm run dev
 ```
 
-Buka `http://localhost:3000`, lalu pilih **Coba dashboard demo**. Kuis contoh dapat dibuka melalui `/q/AtomX2-7Kp9LmQ` setelah data seed dimasukkan.
+Buka `http://localhost:3000`, lalu masuk menggunakan akun guru yang terdaftar pada Firebase Authentication.
 
 ## Perintah
 
 ```bash
 npm run typecheck
 npm run build
-node scripts/seed-demo.mjs
 ```
 
 ## Struktur data

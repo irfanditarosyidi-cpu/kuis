@@ -33,18 +33,16 @@ export default function ProjectorPage() {
   const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => onAuthStateChanged(auth, (current) => {
-    const demo = localStorage.getItem("ruangtuntas_demo") === "true";
     setUser(current); setReady(true);
-    if (!current && !demo) router.replace("/login");
+    if (!current) router.replace("/login");
   }), [router]);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !user) return;
     const unsubQuiz = onValue(ref(database, `quizzes/${quizId}`), (snapshot) => {
       const value = snapshot.val();
       if (!value) { setQuiz(null); return; }
-      const demo = localStorage.getItem("ruangtuntas_demo") === "true";
-      if (!demo && user && value.teacherId !== user.uid) { router.replace("/teacher"); return; }
+      if (value.teacherId !== user.uid) { router.replace("/teacher"); return; }
       setQuiz({ id: quizId, ...value });
     });
     const unsubAttempts = onValue(ref(database, `attempts/${quizId}`), (snapshot) => setAttempts(snapshot.val() || {}));
