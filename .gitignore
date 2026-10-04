@@ -1,0 +1,12 @@
+node_modules
+.next
+out
+.vercel
+*.log
+*.tsbuildinfo
+.qa-*
+qa-*.png
+.artifact-runtime/
+.env*
+!.env.example
+.openai

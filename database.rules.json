@@ -1,0 +1,70 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    },
+    "quizzes": {
+      "$quizId": {
+        ".read": "auth != null && data.child('teacherId').val() === auth.uid",
+        ".write": "auth != null && ((!data.exists() && newData.child('teacherId').val() === auth.uid) || data.child('teacherId').val() === auth.uid)",
+        ".validate": "!newData.exists() || (newData.hasChildren(['teacherId','title','material','passingScore','status','accessToken']) && newData.child('status').val().matches(/^(draft|active|closed)$/) && newData.child('passingScore').isNumber() && newData.child('passingScore').val() >= 0 && newData.child('passingScore').val() <= 100)"
+      }
+    },
+    "teacherQuizIndex": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    },
+    "questions": {
+      "$quizId": {
+        ".read": "auth != null && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid",
+        ".write": "auth != null && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid"
+      }
+    },
+    "publicQuestions": {
+      "$quizId": {
+        ".read": "auth != null && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid",
+        ".write": "auth != null && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid",
+        "$questionId": {
+          ".validate": "!newData.hasChild('correctAnswer')"
+        }
+      }
+    },
+    "quizAccess": {
+      "$token": {
+        ".read": false,
+        ".write": "auth != null && ((!newData.exists() && data.child('teacherId').val() === auth.uid) || newData.child('teacherId').val() === auth.uid)"
+      }
+    },
+    "quizAccessById": {
+      "$quizId": {
+        ".read": false,
+        ".write": "auth != null && ((!newData.exists() && data.child('teacherId').val() === auth.uid) || newData.child('teacherId').val() === auth.uid)"
+      }
+    },
+    "attempts": {
+      "$quizId": {
+        ".read": "auth != null && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid",
+        ".write": false
+      }
+    },
+    "answers": {
+      "$quizId": {
+        ".read": "auth != null && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid",
+        ".write": false
+      }
+    },
+    "activityLogs": {
+      "$quizId": {
+        ".read": "auth != null && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid",
+        ".write": false
+      }
+    }
+  }
+}

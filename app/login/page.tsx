@@ -1,0 +1,79 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { signInWithEmailAndPassword } from "@firebase/auth";
+import { BookOpenCheck, Eye, EyeOff, GraduationCap, LoaderCircle, Sparkles } from "lucide-react";
+import { auth } from "@/lib/firebase";
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (localStorage.getItem("ruangtuntas_demo") === "true") router.replace("/teacher");
+  }, [router]);
+
+  async function login(event: React.FormEvent) {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      router.push("/teacher");
+    } catch {
+      setError("Email atau kata sandi belum cocok. Periksa kembali data masuk Anda.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function enterDemo() {
+    localStorage.setItem("ruangtuntas_demo", "true");
+    router.push("/teacher");
+  }
+
+  return (
+    <main className="login-page">
+      <section className="login-story">
+        <div className="brand"><span className="brand-mark"><BookOpenCheck size={20} /></span>RuangTuntas</div>
+        <div className="story-copy rise">
+          <p className="eyebrow" style={{ color: "var(--lime)" }}>Assess • Understand • Follow up</p>
+          <h1>Setiap hasil punya <em>langkah berikutnya.</em></h1>
+          <p>Pantau proses belajar secara langsung, pahami kebutuhan tiap siswa, lalu lanjutkan dengan remedial atau pengayaan yang tepat.</p>
+        </div>
+        <div className="quote">“Asesmen bukan garis akhir. Ia adalah kompas untuk pembelajaran berikutnya.”</div>
+      </section>
+
+      <section className="login-panel">
+        <div className="login-box rise">
+          <span className="eyebrow">Portal guru</span>
+          <h2>Selamat datang kembali</h2>
+          <p className="muted">Masuk untuk mengelola kuis dan melihat perkembangan siswa Anda.</p>
+          <form className="login-form" onSubmit={login}>
+            <label className="field">
+              <span>Email</span>
+              <input className="input" type="email" placeholder="guru@sekolah.sch.id" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </label>
+            <label className="field">
+              <span>Kata sandi</span>
+              <div className="password-wrap">
+                <input className="input" type={showPassword ? "text" : "password"} placeholder="Masukkan kata sandi" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+                <button type="button" aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"} onClick={() => setShowPassword((value) => !value)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+              </div>
+            </label>
+            {error && <div className="error-box">{error}</div>}
+            <button className="btn btn-primary login-submit" disabled={loading}>{loading ? <LoaderCircle className="spin" size={18} /> : <GraduationCap size={18} />}{loading ? "Memeriksa…" : "Masuk sebagai Guru"}</button>
+          </form>
+          <div className="divider">atau lihat produknya sekarang</div>
+          <button className="btn btn-outline" style={{ width: "100%", minHeight: 47 }} onClick={enterDemo}><Sparkles size={17} />Coba dashboard demo</button>
+          <p className="login-note">Siswa tidak perlu login — cukup buka tautan kuis dari guru.</p>
+        </div>
+      </section>
+    </main>
+  );
+}
