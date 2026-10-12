@@ -51,19 +51,28 @@
     "attempts": {
       "$quizId": {
         ".read": "auth != null && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid",
-        ".write": false
+        ".write": "auth != null && !newData.exists() && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid",
+        "$attemptId": {
+          ".write": "auth != null && !newData.exists() && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid"
+        }
       }
     },
     "answers": {
       "$quizId": {
         ".read": "auth != null && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid",
-        ".write": false
+        ".write": "auth != null && !newData.exists() && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid",
+        "$attemptId": {
+          ".write": "auth != null && !newData.exists() && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid"
+        }
       }
     },
     "activityLogs": {
       "$quizId": {
         ".read": "auth != null && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid",
-        ".write": false
+        ".write": "auth != null && !newData.exists() && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid",
+        "$attemptId": {
+          ".write": "auth != null && !newData.exists() && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid"
+        }
       }
     }
   }

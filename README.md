@@ -17,7 +17,18 @@ Buka `http://localhost:3000`, lalu masuk menggunakan akun guru yang terdaftar pa
 
 ```bash
 npm run typecheck
+npm run test:orbital
 npm run build
+```
+
+Untuk membuat akun guru baru sekaligus menyalin seluruh kuis dan soal dari guru yang sudah ada, jalankan skrip provisioning dengan kredensial melalui environment variable. Skrip membuat ID kuis dan tautan baru, serta tidak menyalin jawaban, aktivitas, atau nilai siswa.
+
+```powershell
+$env:SOURCE_TEACHER_UID="uid-guru-sumber"
+$env:NEW_TEACHER_EMAIL="guru-baru@sekolah.sch.id"
+$env:NEW_TEACHER_PASSWORD="kata-sandi-baru"
+$env:NEW_TEACHER_NAME="Guru 2"
+npm run clone:teacher
 ```
 
 ## Struktur data
@@ -30,6 +41,8 @@ npm run build
 Penilaian dilakukan di `app/api/attempts/[attemptId]/submit/route.ts`. Browser siswa tidak pernah menerima `correctAnswer`.
 
 Guru dapat mengimpor hingga 200 soal sekaligus melalui menu **Soal → Impor Excel**. Gunakan template `/template-soal-ruangtuntas.xlsx`; file dibaca dan divalidasi langsung di browser sebelum disimpan ke Firebase.
+
+Diagram orbital dapat ditulis sebagai teks pada pertanyaan maupun pilihan jawaban, misalnya `[↑↓][↑][↑]`. Format `[↑↓]`, `[↑]`, `[↓]`, `[ ]`, dan konfigurasi pengecoh seperti `[↑↑]` akan dirender otomatis sebagai kotak orbital tanpa mengubah teks yang tersimpan.
 
 Saat kuis berlangsung, buka **Monitoring → Mode Proyektor** untuk menampilkan nama, progres, jumlah keluar halaman, dan riwayat keluar/kembali siswa secara real-time tanpa menampilkan nilai.
 

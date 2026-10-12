@@ -7,6 +7,8 @@ import {
   FileQuestion, GraduationCap, LoaderCircle, LockKeyhole, RotateCcw, Save, Send,
   ShieldCheck, Sparkles, Trophy, UserRound, XCircle,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { OrbitalText } from "@/components/OrbitalText";
 import type { ActivityLog, Attempt, PublicQuiz, Question, StudentIdentity } from "@/lib/types";
 import { formatDuration, shuffleArray } from "@/lib/utils";
 
@@ -33,11 +35,28 @@ export default function StudentQuizPage() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [submitConfirmationOpen, setSubmitConfirmationOpen] = useState(false);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "offline">("saved");
   const lastLeaveAt = useRef(0);
   const submitting = useRef(false);
   const trackingPaused = useRef(false);
   const storageKey = `ruangtuntas_session_${token}`;
+
+  const resetDeletedSession = useCallback(() => {
+    localStorage.removeItem(storageKey);
+    setSession(null);
+    setResumeSession(null);
+    setAttempt(null);
+    setAnswers({});
+    setCurrent(0);
+    setRemaining(null);
+    setSaveState("saved");
+    setSubmitConfirmationOpen(false);
+    submitting.current = false;
+    trackingPaused.current = false;
+    setError("Sesi ini telah dihapus oleh guru. Silakan mulai kembali.");
+    setPhase("access");
+  }, [storageKey]);
 
   useEffect(() => {
     (async () => {
@@ -117,22 +136,19 @@ export default function StudentQuizPage() {
     return () => { document.removeEventListener("visibilitychange", onVisibility); window.removeEventListener("blur", onBlur); window.removeEventListener("pagehide", onPageHide); };
   }, [phase, sendEvent]);
 
-  const submitQuiz = useCallback(async (automatic = false) => {
+  const submitQuiz = useCallback(async () => {
     if (!session || submitting.current) return;
     trackingPaused.current = true;
-    if (!automatic && !confirm(`Kumpulkan jawaban sekarang? ${Object.keys(answers).length}/${questions.length} soal telah dijawab.`)) {
-      trackingPaused.current = false;
-      return;
-    }
     submitting.current = true; setBusy(true); setError("");
     try {
       const response = await fetch(`/api/attempts/${session.attemptId}/submit`, { method: "POST", headers: { "content-type": "application/json", "x-session-token": session.sessionToken }, body: JSON.stringify({ quizId: session.quizId }) });
       const data = await response.json();
+      if (response.status === 401) { resetDeletedSession(); return; }
       if (!response.ok) throw new Error(data.error);
-      setAttempt(data.attempt); setPhase("result");
-    } catch (submitError) { setError(submitError instanceof Error ? submitError.message : "Jawaban belum dapat dikumpulkan."); submitting.current = false; trackingPaused.current = false; }
+      setSubmitConfirmationOpen(false); setAttempt(data.attempt); setPhase("result");
+    } catch (submitError) { setSubmitConfirmationOpen(false); setError(submitError instanceof Error ? submitError.message : "Jawaban belum dapat dikumpulkan."); submitting.current = false; trackingPaused.current = false; }
     finally { setBusy(false); }
-  }, [answers, questions.length, session]);
+  }, [answers, questions.length, resetDeletedSession, session]);
 
   useEffect(() => {
     if (phase !== "playing" || !payload?.quiz.durationMinutes || !session) { setRemaining(null); return; }
@@ -140,7 +156,7 @@ export default function StudentQuizPage() {
     const tick = () => {
       const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
       setRemaining(seconds);
-      if (seconds === 0) submitQuiz(true);
+      if (seconds === 0) submitQuiz();
     };
     tick(); const timer = setInterval(tick, 1000); return () => clearInterval(timer);
   }, [payload?.quiz.durationMinutes, phase, session, submitQuiz]);
@@ -150,6 +166,7 @@ export default function StudentQuizPage() {
     setAnswers((state) => ({ ...state, [questionId]: answer })); setSaveState("saving");
     try {
       const response = await fetch(`/api/attempts/${session.attemptId}/answer`, { method: "POST", headers: { "content-type": "application/json", "x-session-token": session.sessionToken }, body: JSON.stringify({ quizId: session.quizId, questionId, answer, total: questions.length }) });
+      if (response.status === 401) { resetDeletedSession(); return; }
       if (!response.ok) throw new Error();
       setSaveState("saved");
     } catch { setSaveState("offline"); }
@@ -172,8 +189,19 @@ export default function StudentQuizPage() {
     if (!question) return <StudentChrome><StatusCard icon={<FileQuestion size={38} />} title="Soal belum tersedia" text="Guru belum menambahkan soal ke kuis ini." /></StudentChrome>;
     return <StudentChrome minimal><main className="quiz-shell rise"><div className="card quiz-topbar"><div className="quiz-user"><div className="avatar"><UserRound size={17} /></div><div><strong>{attempt.student.name}</strong><span>{payload.quiz.title}</span></div></div>{remaining !== null && <div className={`timer ${remaining <= 60 ? "urgent" : ""}`}><Clock3 size={16} />{formatDuration(remaining)}</div>}</div>
       {error && <div className="error-box" style={{ marginBottom: 14 }}>{error}</div>}
-      <div className="quiz-layout"><section className="card question-card"><span className="question-count">Soal {current + 1} dari {questions.length}</span><h1 className="question-text">{question.text}</h1><div className="answers">{optionEntries.map(([key, text]) => <label className={`answer ${answers[question.id] === key ? "selected" : ""}`} key={key}><input type="radio" name={question.id} checked={answers[question.id] === key} onChange={() => chooseAnswer(question.id, key)} /><span className="answer-letter">{key}</span><span>{text}</span></label>)}</div><div className="quiz-controls"><button className="btn btn-light" disabled={current === 0} onClick={() => setCurrent((value) => value - 1)}><ArrowLeft size={17} /><span>Sebelumnya</span></button><div>{current < questions.length - 1 ? <button className="btn btn-primary" onClick={() => setCurrent((value) => value + 1)}><span>Berikutnya</span><ArrowRight size={17} /></button> : <button className="btn btn-primary" onClick={() => submitQuiz(false)} disabled={busy}>{busy ? <LoaderCircle className="spin" size={17} /> : <Send size={17} />}<span>Kumpulkan</span></button>}</div></div></section><aside className="quiz-side"><div className="card progress-panel"><h3>Progres pengerjaan</h3><div className="progress-bar"><span style={{ width: `${questions.length ? (answeredCount / questions.length) * 100 : 0}%` }} /></div><div className="progress-copy"><span>{answeredCount} soal dijawab</span><strong>{Math.round((answeredCount / questions.length) * 100)}%</strong></div><div className="question-map">{questions.map((item, index) => <button className={`q-dot ${answers[item.id] ? "answered" : ""} ${index === current ? "current" : ""}`} onClick={() => setCurrent(index)} key={item.id}>{index + 1}</button>)}</div></div><div className="card save-state">{saveState === "saving" ? <LoaderCircle className="spin" size={15} /> : saveState === "offline" ? <AlertCircle size={15} /> : <Check size={15} />}<span>{saveState === "saving" ? "Menyimpan jawaban…" : saveState === "offline" ? "Belum tersimpan — pilih ulang saat online" : "Semua jawaban tersimpan"}</span></div></aside></div>
-    </main></StudentChrome>;
+      <div className="quiz-layout"><section className="card question-card"><span className="question-count">Soal {current + 1} dari {questions.length}</span><h1 className="question-text"><OrbitalText text={question.text} /></h1><div className="answers">{optionEntries.map(([key, text]) => <label className={`answer ${answers[question.id] === key ? "selected" : ""}`} key={key}><input type="radio" name={question.id} checked={answers[question.id] === key} onChange={() => chooseAnswer(question.id, key)} /><span className="answer-letter">{key}</span><OrbitalText text={text} /></label>)}</div><div className="quiz-controls"><button className="btn btn-light" disabled={current === 0} onClick={() => setCurrent((value) => value - 1)}><ArrowLeft size={17} /><span>Sebelumnya</span></button><div>{current < questions.length - 1 ? <button className="btn btn-primary" onClick={() => setCurrent((value) => value + 1)}><span>Berikutnya</span><ArrowRight size={17} /></button> : <button className="btn btn-primary" onClick={() => { trackingPaused.current = true; setSubmitConfirmationOpen(true); }} disabled={busy}>{busy ? <LoaderCircle className="spin" size={17} /> : <Send size={17} />}<span>Kumpulkan</span></button>}</div></div></section><aside className="quiz-side"><div className="card progress-panel"><h3>Progres pengerjaan</h3><div className="progress-bar"><span style={{ width: `${questions.length ? (answeredCount / questions.length) * 100 : 0}%` }} /></div><div className="progress-copy"><span>{answeredCount} soal dijawab</span><strong>{Math.round((answeredCount / questions.length) * 100)}%</strong></div><div className="question-map">{questions.map((item, index) => <button className={`q-dot ${answers[item.id] ? "answered" : ""} ${index === current ? "current" : ""}`} onClick={() => setCurrent(index)} key={item.id}>{index + 1}</button>)}</div></div><div className="card save-state">{saveState === "saving" ? <LoaderCircle className="spin" size={15} /> : saveState === "offline" ? <AlertCircle size={15} /> : <Check size={15} />}<span>{saveState === "saving" ? "Menyimpan jawaban…" : saveState === "offline" ? "Belum tersimpan — pilih ulang saat online" : "Semua jawaban tersimpan"}</span></div></aside></div>
+    </main><ConfirmDialog
+      open={submitConfirmationOpen}
+      title="Kumpulkan jawaban?"
+      description="Setelah dikumpulkan, jawaban tidak dapat diubah kembali."
+      detail={<><strong>{answeredCount} dari {questions.length}</strong> soal telah dijawab.{answeredCount < questions.length && <> Masih ada {questions.length - answeredCount} soal yang belum dijawab.</>}</>}
+      confirmLabel="Kumpulkan sekarang"
+      loadingLabel="Mengumpulkan..."
+      tone="primary"
+      loading={busy}
+      onConfirm={submitQuiz}
+      onCancel={() => { trackingPaused.current = false; setSubmitConfirmationOpen(false); }}
+    /></StudentChrome>;
   }
 
   if (payload.quiz.status !== "active" && !resumeSession) {

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { signInWithEmailAndPassword } from "@firebase/auth";
 import { BookOpenCheck, Eye, EyeOff, GraduationCap, LoaderCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
@@ -31,7 +32,7 @@ export default function LoginPage() {
   return (
     <main className="login-page">
       <section className="login-story">
-        <div className="brand"><span className="brand-mark"><BookOpenCheck size={20} /></span>RuangTuntas</div>
+        <Link className="brand" href="/"><span className="brand-mark"><BookOpenCheck size={20} /></span>RuangTuntas</Link>
         <div className="story-copy rise">
           <p className="eyebrow" style={{ color: "var(--lime)" }}>Assess • Understand • Follow up</p>
           <h1>Setiap hasil punya <em>langkah berikutnya.</em></h1>
@@ -48,17 +49,17 @@ export default function LoginPage() {
           <form className="login-form" onSubmit={login}>
             <label className="field">
               <span>Email</span>
-              <input className="input" type="email" placeholder="guru@sekolah.sch.id" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <input className="input" type="email" autoComplete="email" placeholder="guru@sekolah.sch.id" value={email} onChange={(e) => setEmail(e.target.value)} required aria-invalid={!!error} />
             </label>
             <label className="field">
               <span>Kata sandi</span>
               <div className="password-wrap">
-                <input className="input" type={showPassword ? "text" : "password"} placeholder="Masukkan kata sandi" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+                <input className="input" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Masukkan kata sandi" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} aria-invalid={!!error} />
                 <button type="button" aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"} onClick={() => setShowPassword((value) => !value)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
               </div>
             </label>
-            {error && <div className="error-box">{error}</div>}
-            <button className="btn btn-primary login-submit" disabled={loading}>{loading ? <LoaderCircle className="spin" size={18} /> : <GraduationCap size={18} />}{loading ? "Memeriksa…" : "Masuk sebagai Guru"}</button>
+            {error && <div className="error-box" role="alert">{error}</div>}
+            <button className="btn btn-primary login-submit" disabled={loading} aria-busy={loading}>{loading ? <LoaderCircle className="spin" size={18} /> : <GraduationCap size={18} />}{loading ? "Memeriksa…" : "Masuk sebagai Guru"}</button>
           </form>
           <p className="login-note">Siswa tidak perlu login — cukup buka tautan kuis dari guru.</p>
         </div>
