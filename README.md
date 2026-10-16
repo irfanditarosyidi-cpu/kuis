@@ -2,6 +2,8 @@
 
 Platform kuis online untuk tahap **Assessing & Follow Up**. Guru dapat membuat kuis pilihan ganda dengan lima opsi jawaban, membagikan tautan unik, memantau pengerjaan secara real-time, melihat indikator perpindahan halaman, dan memperoleh klasifikasi Remedial/Pengayaan otomatis.
 
+Guru juga dapat menulis atau mengimpor soal uraian remedial dan pengayaan pada menu **Tindak lanjut**. Setelah mengumpulkan kuis, siswa dapat mengunduh PDF berisi soal yang sesuai dengan klasifikasi nilainya. PDF dibuat saat diunduh dan tidak disimpan sebagai file di database.
+
 ## Menjalankan lokal
 
 Konfigurasi Firebase Web dari proyek `tesis-5c7ab` sudah tertanam di `lib/firebase.ts`, jadi tidak perlu membuat `.env` untuk mencoba aplikasi.
@@ -36,6 +38,7 @@ npm run clone:teacher
 - `quizzes` dan `questions`: data privat guru, termasuk kunci jawaban.
 - `quizAccess` dan `publicQuestions`: payload aman untuk route siswa, tanpa kunci jawaban.
 - `attempts`, `answers`, `activityLogs`: sesi siswa, jawaban, progres, dan event monitoring.
+- `followUpQuestions`: soal uraian remedial/pengayaan yang disimpan di Realtime Database tanpa kunci jawaban.
 - `teacherQuizIndex`: indeks kuis per guru.
 
 Penilaian dilakukan di `app/api/attempts/[attemptId]/submit/route.ts`. Browser siswa tidak pernah menerima `correctAnswer`.

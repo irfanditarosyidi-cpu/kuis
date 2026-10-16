@@ -74,6 +74,18 @@
           ".write": "auth != null && !newData.exists() && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid"
         }
       }
+    },
+    "followUpQuestions": {
+      "$quizId": {
+        ".read": "auth != null && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid",
+        ".write": "auth != null && root.child('quizzes').child($quizId).child('teacherId').val() === auth.uid",
+        "$category": {
+          ".validate": "$category.matches(/^(REMEDIAL|PENGAYAAN)$/)",
+          "$questionId": {
+            ".validate": "!newData.exists() || (newData.hasChildren(['text','order']) && newData.child('text').isString() && newData.child('text').val().length >= 3 && newData.child('text').val().length <= 1000 && newData.child('order').isNumber() && newData.child('order').val() > 0)"
+          }
+        }
+      }
     }
   }
 }

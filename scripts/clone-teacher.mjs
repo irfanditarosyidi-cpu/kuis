@@ -85,9 +85,10 @@ await requestJson(`https://identitytoolkit.googleapis.com/v1/accounts:update?key
 });
 
 const readAuth = databaseAuth || undefined;
-const [allQuizzes, allQuestions, targetIndex] = await Promise.all([
+const [allQuizzes, allQuestions, allFollowUpQuestions, targetIndex] = await Promise.all([
   databaseGet("quizzes", readAuth),
   databaseGet("questions", readAuth),
+  databaseGet("followUpQuestions", readAuth),
   databaseGet(`teacherQuizIndex/${account.localId}`, account.idToken),
 ]);
 
@@ -151,6 +152,9 @@ for (const [sourceQuizId, sourceQuiz] of sourceQuizzes) {
 
   updates[`quizzes/${quizId}`] = quiz;
   updates[`questions/${quizId}`] = questions;
+  if (allFollowUpQuestions?.[sourceQuizId]) {
+    updates[`followUpQuestions/${quizId}`] = allFollowUpQuestions[sourceQuizId];
+  }
   updates[`publicQuestions/${quizId}`] = Object.fromEntries(
     Object.entries(questions).map(([questionId, question]) => [questionId, publicQuestion(question)]),
   );

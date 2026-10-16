@@ -8,7 +8,7 @@ import { QRCodeCanvas } from "qrcode.react";
 import {
   Activity, AlertTriangle, ArrowLeft, BarChart3, BookOpen, BookOpenCheck, CheckCircle2,
   ChevronDown, ChevronUp, ClipboardList, Clock3, Copy, Edit3, ExternalLink, FileQuestion,
-  FileSpreadsheet, Download, LayoutDashboard, Link2, ListChecks, LoaderCircle, LogOut, Menu,
+  FileSpreadsheet, FileText, Download, LayoutDashboard, Link2, ListChecks, LoaderCircle, LogOut, Menu,
   MoreVertical, Plus, QrCode, RefreshCcw, Save, Settings2, Sparkles, Trash2, Trophy, UploadCloud,
   Users, X, XCircle, Presentation,
 } from "lucide-react";
@@ -17,10 +17,10 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { OrbitalText } from "@/components/OrbitalText";
 import { auth, database } from "@/lib/firebase";
 import { hasOrbitalNotation } from "@/lib/orbital";
-import type { ActivityLog, AnswerKey, Attempt, Question, Quiz, QuizStatus } from "@/lib/types";
+import type { ActivityLog, AnswerKey, Attempt, FollowUpCategory, FollowUpQuestion, Question, Quiz, QuizStatus } from "@/lib/types";
 import { formatDate, generateToken } from "@/lib/utils";
 
-type Tab = "info" | "questions" | "monitor" | "results";
+type Tab = "info" | "questions" | "followup" | "monitor" | "results";
 type TeacherView = "dashboard" | "quizzes";
 type QuizForm = Pick<Quiz, "title" | "material" | "description" | "passingScore" | "durationMinutes" | "shuffleQuestions" | "shuffleOptions">;
 
@@ -134,6 +134,7 @@ export default function TeacherPage() {
         [`attempts/${quiz.id}`]: null,
         [`answers/${quiz.id}`]: null,
         [`activityLogs/${quiz.id}`]: null,
+        [`followUpQuestions/${quiz.id}`]: null,
         [`teacherQuizIndex/${teacherId}/${quiz.id}`]: null,
       });
       if (selectedId === quiz.id) setSelectedId(null);
@@ -327,9 +328,10 @@ function QuizManager({ quiz, tab, setTab, onDashboard, onShowQuizzes, onEdit, on
     <aside className="sidebar"><div className="brand"><span className="brand-mark"><BookOpenCheck size={20} /></span>RuangTuntas</div><nav className="nav"><button className="nav-button" onClick={onDashboard}><LayoutDashboard size={18} />Dashboard</button><button className="nav-button active" onClick={onShowQuizzes}><ClipboardList size={18} />Kuis saya</button></nav><div className="sidebar-bottom"><button className="nav-button" onClick={onShowQuizzes}><ArrowLeft size={17} />Kembali ke daftar</button></div></aside>
     <main className="main">
       <header className="editor-header"><button className="back-button" onClick={onShowQuizzes}><ArrowLeft size={15} />Kembali ke daftar kuis</button><div className="editor-title-row"><div><div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}><span className={`badge badge-${quiz.status}`}>{statusLabel(quiz.status)}</span><span className="muted small">Diperbarui {formatDate(quiz.updatedAt, true)}</span></div><h1>{quiz.title}</h1><p className="muted" style={{ margin: 0 }}>{quiz.material}</p></div><button className="btn btn-outline" onClick={onEdit}><Settings2 size={17} />Edit pengaturan</button></div></header>
-      <nav className="editor-tabs">{([["info", Link2, "Informasi & link"], ["questions", ListChecks, `Soal (${questions.length})`], ["monitor", Activity, "Monitoring"], ["results", BarChart3, "Hasil"]] as const).map(([id, Icon, label]) => <button className={`editor-tab ${tab === id ? "active" : ""}`} key={id} onClick={() => setTab(id)}><Icon size={15} style={{ verticalAlign: -3, marginRight: 7 }} />{label}</button>)}</nav>
+      <nav className="editor-tabs">{([["info", Link2, "Informasi & link"], ["questions", ListChecks, `Soal (${questions.length})`], ["followup", FileText, "Tindak lanjut"], ["monitor", Activity, "Monitoring"], ["results", BarChart3, "Hasil"]] as const).map(([id, Icon, label]) => <button className={`editor-tab ${tab === id ? "active" : ""}`} key={id} onClick={() => setTab(id)}><Icon size={15} style={{ verticalAlign: -3, marginRight: 7 }} />{label}</button>)}</nav>
       {tab === "info" && <InfoTab quiz={quiz} questionCount={questions.length} copyLink={copyLink} setStatus={setStatus} />}
       {tab === "questions" && <section><div className="section-head"><div><h2 className="section-title">Daftar soal</h2><p className="muted small">Kunci jawaban hanya tersimpan pada node privat.</p></div><div className="question-head-actions"><button className="btn btn-outline" onClick={() => setImportModal(true)}><UploadCloud size={17} />Impor Excel</button><button className="btn btn-primary" onClick={() => setQuestionModal("new")}><Plus size={17} />Tambah soal</button></div></div><div className="question-list">{questions.map((q, index) => <div className="card question-row" key={q.id}><div className="question-number">{index + 1}</div><div><h4><OrbitalText text={q.text} /></h4><p className="muted small">Jawaban: <strong>{q.correctAnswer}</strong> · Bobot {q.weight}</p></div><div className="row-actions"><button className="icon-btn" disabled={index === 0} onClick={() => moveQuestion(q, -1)}><ChevronUp size={15} /></button><button className="icon-btn" disabled={index === questions.length - 1} onClick={() => moveQuestion(q, 1)}><ChevronDown size={15} /></button><button className="icon-btn" onClick={() => setQuestionModal(q)}><Edit3 size={15} /></button><button className="icon-btn icon-btn-danger" aria-label="Hapus soal" title="Hapus soal" onClick={() => setQuestionToDelete(q)}><Trash2 size={15} /></button></div></div>)}{!questions.length && <div className="card empty-state"><div><div className="empty-illustration"><ListChecks size={34} /></div><h3>Soal belum ditambahkan</h3><p className="muted">Tambahkan satu per satu atau impor banyak soal dari template Excel.</p><div style={{ display: "flex", gap: 9, justifyContent: "center", flexWrap: "wrap" }}><button className="btn btn-outline" onClick={() => setImportModal(true)}><UploadCloud size={17} />Impor Excel</button><button className="btn btn-primary" onClick={() => setQuestionModal("new")}><Plus size={17} />Tambah soal</button></div></div></div>}</div></section>}
+      {tab === "followup" && <FollowUpQuestionsTab quiz={quiz} onToast={onToast} />}
       {tab === "monitor" && <Monitoring quiz={quiz} attempts={attempts} onDelete={setAttemptToDelete} deletingAttemptId={deletingAttemptId} />}
       {tab === "results" && <Results quizId={quiz.id} questions={questions} attempts={attempts} onDelete={setAttemptToDelete} deletingAttemptId={deletingAttemptId} />}
     </main>
@@ -417,6 +419,96 @@ function QuestionModal({ quiz, questions, initial, onClose, onSaved }: { quiz: Q
       <div className="modal-actions"><button type="button" className="btn btn-light" onClick={onClose}>Batal</button><button className="btn btn-primary" disabled={saving}>{saving ? <LoaderCircle className="spin" size={17} /> : <Save size={17} />}{saving ? "Menyimpan…" : "Simpan soal"}</button></div>
     </div>
   </form></div>;
+}
+
+type FollowUpEditorState = { category: FollowUpCategory; question: FollowUpQuestion | null };
+
+function FollowUpQuestionsTab({ quiz, onToast }: { quiz: Quiz; onToast: (message: string) => void }) {
+  const [category, setCategory] = useState<FollowUpCategory>("REMEDIAL");
+  const [questionsByCategory, setQuestionsByCategory] = useState<Record<FollowUpCategory, FollowUpQuestion[]>>({ REMEDIAL: [], PENGAYAAN: [] });
+  const [editor, setEditor] = useState<FollowUpEditorState | null>(null);
+  const [importCategory, setImportCategory] = useState<FollowUpCategory | null>(null);
+  const [questionToDelete, setQuestionToDelete] = useState<FollowUpEditorState | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => onValue(ref(database, `followUpQuestions/${quiz.id}`), (snapshot) => {
+    const raw = snapshot.val() || {};
+    const readCategory = (target: FollowUpCategory) => Object.entries(raw[target] || {})
+      .map(([id, value]) => ({ id, ...(value as Omit<FollowUpQuestion, "id">) }))
+      .sort((first, second) => first.order - second.order);
+    setQuestionsByCategory({ REMEDIAL: readCategory("REMEDIAL"), PENGAYAAN: readCategory("PENGAYAAN") });
+  }), [quiz.id]);
+
+  const questions = questionsByCategory[category];
+  const categoryLabel = category === "REMEDIAL" ? "remedial" : "pengayaan";
+
+  async function moveQuestion(question: FollowUpQuestion, direction: -1 | 1) {
+    const index = questions.findIndex((item) => item.id === question.id);
+    const target = questions[index + direction];
+    if (!target) return;
+    await update(ref(database), {
+      [`followUpQuestions/${quiz.id}/${category}/${question.id}/order`]: target.order,
+      [`followUpQuestions/${quiz.id}/${category}/${target.id}/order`]: question.order,
+      [`quizzes/${quiz.id}/updatedAt`]: Date.now(),
+    });
+  }
+
+  async function deleteQuestion() {
+    if (!questionToDelete?.question || deleting) return;
+    setDeleting(true);
+    try {
+      await update(ref(database), {
+        [`followUpQuestions/${quiz.id}/${questionToDelete.category}/${questionToDelete.question.id}`]: null,
+        [`quizzes/${quiz.id}/updatedAt`]: Date.now(),
+      });
+      setQuestionToDelete(null);
+      onToast("Soal uraian berhasil dihapus");
+    } catch {
+      onToast("Soal uraian gagal dihapus. Coba lagi.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return <section>
+    <div className="section-head"><div><h2 className="section-title">Soal tindak lanjut</h2><p className="muted small">Soal berbentuk uraian tanpa kunci jawaban. Siswa akan mengunduhnya sebagai PDF sesuai hasil kuis.</p></div><div className="question-head-actions"><button className="btn btn-outline" onClick={() => setImportCategory(category)}><UploadCloud size={17} />Impor Excel</button><button className="btn btn-primary" onClick={() => setEditor({ category, question: null })}><Plus size={17} />Tambah soal uraian</button></div></div>
+    <div className="followup-category-tabs">
+      <button className={category === "REMEDIAL" ? "active remedial" : ""} onClick={() => setCategory("REMEDIAL")}><RefreshCcw size={17} /><span><strong>Remedial</strong><small>Nilai di bawah batas</small></span><b>{questionsByCategory.REMEDIAL.length}</b></button>
+      <button className={category === "PENGAYAAN" ? "active enrichment" : ""} onClick={() => setCategory("PENGAYAAN")}><Trophy size={17} /><span><strong>Pengayaan</strong><small>Nilai mencapai batas</small></span><b>{questionsByCategory.PENGAYAAN.length}</b></button>
+    </div>
+    <div className="question-list">{questions.map((question, index) => <article className="card question-row followup-question-row" key={question.id}><div className="question-number">{index + 1}</div><div><h4><OrbitalText text={question.text} /></h4><p className="muted small">Soal uraian {categoryLabel}</p></div><div className="row-actions"><button className="icon-btn" disabled={index === 0} onClick={() => moveQuestion(question, -1)} aria-label="Naikkan urutan"><ChevronUp size={15} /></button><button className="icon-btn" disabled={index === questions.length - 1} onClick={() => moveQuestion(question, 1)} aria-label="Turunkan urutan"><ChevronDown size={15} /></button><button className="icon-btn" onClick={() => setEditor({ category, question })} aria-label="Edit soal"><Edit3 size={15} /></button><button className="icon-btn icon-btn-danger" onClick={() => setQuestionToDelete({ category, question })} aria-label="Hapus soal"><Trash2 size={15} /></button></div></article>)}
+      {!questions.length && <div className="card empty-state followup-empty"><div><div className="empty-illustration"><FileText size={34} /></div><h3>Soal {categoryLabel} belum ada</h3><p className="muted">Tambahkan soal uraian satu per satu atau impor kolom Pertanyaan dari template Excel yang sama.</p><div className="empty-actions"><button className="btn btn-outline" onClick={() => setImportCategory(category)}><UploadCloud size={17} />Impor Excel</button><button className="btn btn-primary" onClick={() => setEditor({ category, question: null })}><Plus size={17} />Tambah soal</button></div></div></div>}
+    </div>
+    {editor && <FollowUpQuestionModal quiz={quiz} category={editor.category} questions={questionsByCategory[editor.category]} initial={editor.question} onClose={() => setEditor(null)} onSaved={() => { setEditor(null); onToast("Soal uraian berhasil disimpan"); }} />}
+    {importCategory && <FollowUpExcelImportModal quiz={quiz} category={importCategory} existingCount={questionsByCategory[importCategory].length} onClose={() => setImportCategory(null)} onImported={(count) => { setImportCategory(null); onToast(`${count} soal uraian berhasil diimpor`); }} />}
+    <ConfirmDialog open={!!questionToDelete} title="Hapus soal uraian?" description={`Soal ini akan dihapus dari daftar ${questionToDelete?.category === "REMEDIAL" ? "remedial" : "pengayaan"}.`} detail={questionToDelete?.question ? <OrbitalText text={questionToDelete.question.text} /> : null} confirmLabel="Hapus soal" loadingLabel="Menghapus soal..." loading={deleting} onConfirm={deleteQuestion} onCancel={() => setQuestionToDelete(null)} />
+  </section>;
+}
+
+function FollowUpQuestionModal({ quiz, category, questions, initial, onClose, onSaved }: { quiz: Quiz; category: FollowUpCategory; questions: FollowUpQuestion[]; initial: FollowUpQuestion | null; onClose: () => void; onSaved: () => void }) {
+  const [text, setText] = useState(initial?.text || "");
+  const [saving, setSaving] = useState(false);
+  const label = category === "REMEDIAL" ? "remedial" : "pengayaan";
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    const cleaned = text.trim();
+    if (cleaned.length < 3) return;
+    setSaving(true);
+    try {
+      const id = initial?.id || push(ref(database, `followUpQuestions/${quiz.id}/${category}`)).key!;
+      const order = initial?.order || Math.max(0, ...questions.map((question) => question.order)) + 1;
+      await update(ref(database), {
+        [`followUpQuestions/${quiz.id}/${category}/${id}`]: { text: cleaned, order },
+        [`quizzes/${quiz.id}/updatedAt`]: Date.now(),
+      });
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <div className="overlay"><form className="modal" onSubmit={save}><div className="modal-head"><div><h2>{initial ? "Edit" : "Tambah"} soal {label}</h2><p className="muted small">Tuliskan pertanyaan uraian saja, tanpa kunci jawaban.</p></div><button type="button" className="icon-btn" onClick={onClose}><X size={18} /></button></div><div className="modal-body"><label className="field"><span>Pertanyaan uraian</span><textarea className="textarea followup-textarea" value={text} onChange={(event) => setText(event.target.value)} placeholder="Contoh: Jelaskan proses terbentuknya konfigurasi elektron..." minLength={3} maxLength={1000} required /></label>{hasOrbitalNotation(text) && <div className="orbital-input-preview"><small>Pratinjau pertanyaan</small><OrbitalText text={text} /></div>}<p className="muted followup-char-count">{text.length}/1000 karakter</p><div className="modal-actions"><button type="button" className="btn btn-light" onClick={onClose}>Batal</button><button className="btn btn-primary" disabled={saving || text.trim().length < 3}>{saving ? <LoaderCircle className="spin" size={17} /> : <Save size={17} />}{saving ? "Menyimpan..." : "Simpan soal"}</button></div></div></form></div>;
 }
 
 function AttemptActions({ attempt, viewLabel, onView, onDelete, deleting }: { attempt: Attempt; viewLabel: string; onView: () => void; onDelete: (attempt: Attempt) => void; deleting: boolean }) {
@@ -559,5 +651,78 @@ function ExcelImportModal({ quiz, existingCount, onClose, onImported }: { quiz: 
     {errors.length > 0 && <div className="import-errors"><strong><AlertTriangle size={16} />Perlu diperbaiki</strong>{errors.slice(0, 8).map((error) => <p key={error}>{error}</p>)}{errors.length > 8 && <p>…dan {errors.length - 8} kesalahan lainnya.</p>}</div>}
     {rows.length > 0 && <div className="import-preview"><div className="import-preview-head"><div><strong>{rows.length} soal siap diimpor</strong><p className="muted small">Pratinjau {Math.min(rows.length, 6)} baris pertama.</p></div><span className={`badge ${errors.length ? "badge-progress" : "badge-active"}`}>{errors.length ? "Periksa data" : "Valid"}</span></div><div className="table-wrap"><table className="data-table import-table"><thead><tr><th>Baris</th><th>Pertanyaan</th><th>Kunci</th><th>Bobot</th></tr></thead><tbody>{rows.slice(0, 6).map((question) => <tr key={question.sourceRow}><td>{question.sourceRow}</td><td><OrbitalText text={question.text} /></td><td><strong>{question.correctAnswer}</strong></td><td>{question.weight}</td></tr>)}</tbody></table></div></div>}
     <div className="modal-actions"><button className="btn btn-light" onClick={onClose}>Batal</button><button className="btn btn-primary" disabled={!rows.length || !!errors.length || reading || importing} onClick={importQuestions}>{importing ? <LoaderCircle className="spin" size={17} /> : <UploadCloud size={17} />}{importing ? "Mengimpor…" : `Impor ${rows.length || ""} soal`}</button></div>
+  </div></div></div>;
+}
+
+type ImportedEssayQuestion = { sourceRow: number; text: string };
+
+function FollowUpExcelImportModal({ quiz, category, existingCount, onClose, onImported }: { quiz: Quiz; category: FollowUpCategory; existingCount: number; onClose: () => void; onImported: (count: number) => void }) {
+  const [fileName, setFileName] = useState("");
+  const [rows, setRows] = useState<ImportedEssayQuestion[]>([]);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [reading, setReading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const label = category === "REMEDIAL" ? "remedial" : "pengayaan";
+
+  async function readFile(file: File) {
+    setFileName(file.name);
+    setRows([]);
+    setErrors([]);
+    if (!file.name.toLowerCase().endsWith(".xlsx")) { setErrors(["Gunakan file Excel berformat .xlsx."]); return; }
+    if (file.size > 5 * 1024 * 1024) { setErrors(["Ukuran file maksimal 5 MB."]); return; }
+    setReading(true);
+    try {
+      const { readSheet } = await import("read-excel-file/browser");
+      const sheetRows = await readSheet(file, "Soal") as unknown[][];
+      const headerIndex = sheetRows.findIndex((row) => row.some((cell) => normalizeHeader(cell) === "pertanyaan"));
+      if (headerIndex < 0) throw new Error("Tab Soal atau kolom Pertanyaan tidak ditemukan. Gunakan template yang disediakan.");
+      const questionColumn = sheetRows[headerIndex].findIndex((cell) => normalizeHeader(cell) === "pertanyaan");
+      const parsed: ImportedEssayQuestion[] = [];
+      const validationErrors: string[] = [];
+      for (let index = headerIndex + 1; index < sheetRows.length; index++) {
+        const text = String(sheetRows[index][questionColumn] ?? "").trim();
+        if (!text) continue;
+        const sourceRow = index + 1;
+        if (text.length < 3) validationErrors.push(`Baris ${sourceRow}: pertanyaan terlalu pendek.`);
+        else if (text.length > 1000) validationErrors.push(`Baris ${sourceRow}: pertanyaan melebihi 1000 karakter.`);
+        else parsed.push({ sourceRow, text });
+      }
+      if (!parsed.length && !validationErrors.length) validationErrors.push("Tidak ada pertanyaan yang terisi pada tab Soal.");
+      if (parsed.length + validationErrors.length > 200) validationErrors.push("Maksimal 200 soal dalam satu file.");
+      if (existingCount + parsed.length > 200) validationErrors.push(`Jumlah soal akan melebihi batas 200. Daftar ${label} saat ini memiliki ${existingCount} soal.`);
+      setRows(parsed);
+      setErrors(validationErrors);
+    } catch (error) {
+      setErrors([error instanceof Error ? error.message : "File tidak dapat dibaca."]);
+    } finally {
+      setReading(false);
+    }
+  }
+
+  async function importQuestions() {
+    if (!rows.length || errors.length) return;
+    setImporting(true);
+    try {
+      const updates: Record<string, unknown> = {};
+      rows.forEach((question, index) => {
+        const id = push(ref(database, `followUpQuestions/${quiz.id}/${category}`)).key!;
+        updates[`followUpQuestions/${quiz.id}/${category}/${id}`] = { text: question.text, order: existingCount + index + 1 };
+      });
+      updates[`quizzes/${quiz.id}/updatedAt`] = Date.now();
+      await update(ref(database), updates);
+      onImported(rows.length);
+    } catch {
+      setErrors(["Impor gagal disimpan ke database. Periksa koneksi lalu coba lagi."]);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  return <div className="overlay"><div className="modal modal-wide"><div className="modal-head"><div><h2>Impor soal uraian {label}</h2><p className="muted small">Hanya isi kolom Pertanyaan yang akan disimpan. Opsi, kunci, dan bobot pada template diabaikan.</p></div><button className="icon-btn" onClick={onClose}><X size={18} /></button></div><div className="modal-body">
+    <div className="import-guide"><div><strong>1. Unduh dan isi template</strong><p>Gunakan tab Soal dan isi kolom Pertanyaan. Kolom lainnya boleh dikosongkan.</p></div><a className="btn btn-outline btn-sm" href="/template-soal-ruangtuntas.xlsx" download><Download size={15} />Unduh template</a></div>
+    <label className={`import-dropzone ${fileName ? "has-file" : ""}`}><input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readFile(file); }} /><span className="import-file-icon">{reading ? <LoaderCircle className="spin" size={25} /> : <FileSpreadsheet size={26} />}</span><strong>{reading ? "Membaca file..." : fileName || "Pilih file Excel"}</strong><span>{fileName ? "Klik untuk mengganti file" : "Format .xlsx, maksimal 5 MB dan 200 soal"}</span></label>
+    {errors.length > 0 && <div className="import-errors"><strong><AlertTriangle size={16} />Perlu diperbaiki</strong>{errors.slice(0, 8).map((error) => <p key={error}>{error}</p>)}{errors.length > 8 && <p>...dan {errors.length - 8} kesalahan lainnya.</p>}</div>}
+    {rows.length > 0 && <div className="import-preview"><div className="import-preview-head"><div><strong>{rows.length} soal uraian siap diimpor</strong><p className="muted small">Pratinjau {Math.min(rows.length, 6)} baris pertama.</p></div><span className={`badge ${errors.length ? "badge-progress" : "badge-active"}`}>{errors.length ? "Periksa data" : "Valid"}</span></div><div className="table-wrap"><table className="data-table import-table followup-import-table"><thead><tr><th>Baris</th><th>Pertanyaan uraian</th></tr></thead><tbody>{rows.slice(0, 6).map((question) => <tr key={question.sourceRow}><td>{question.sourceRow}</td><td><OrbitalText text={question.text} /></td></tr>)}</tbody></table></div></div>}
+    <div className="modal-actions"><button className="btn btn-light" onClick={onClose}>Batal</button><button className="btn btn-primary" disabled={!rows.length || !!errors.length || reading || importing} onClick={importQuestions}>{importing ? <LoaderCircle className="spin" size={17} /> : <UploadCloud size={17} />}{importing ? "Mengimpor..." : `Impor ${rows.length || ""} soal`}</button></div>
   </div></div></div>;
 }

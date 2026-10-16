@@ -4,12 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   AlertCircle, ArrowLeft, ArrowRight, BookOpenCheck, Check, CheckCircle2, Clock3,
-  FileQuestion, GraduationCap, LoaderCircle, LockKeyhole, RotateCcw, Save, Send,
+  Download, FileQuestion, GraduationCap, LoaderCircle, LockKeyhole, RotateCcw, Save, Send,
   ShieldCheck, Sparkles, Trophy, UserRound, XCircle,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { OrbitalText } from "@/components/OrbitalText";
-import type { ActivityLog, Attempt, PublicQuiz, Question, StudentIdentity } from "@/lib/types";
+import { buildFollowUpPdfDefinition, followUpPdfFileName } from "@/lib/follow-up-pdf";
+import type { ActivityLog, Attempt, FollowUpQuestion, PublicQuiz, Question, StudentIdentity } from "@/lib/types";
 import { formatDuration, shuffleArray } from "@/lib/utils";
 
 type PublicQuestion = Omit<Question, "correctAnswer">;
@@ -31,6 +32,7 @@ export default function StudentQuizPage() {
   const [questions, setQuestions] = useState<PublicQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [attempt, setAttempt] = useState<Attempt | null>(null);
+  const [followUpQuestions, setFollowUpQuestions] = useState<FollowUpQuestion[]>([]);
   const [current, setCurrent] = useState(0);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -47,6 +49,7 @@ export default function StudentQuizPage() {
     setSession(null);
     setResumeSession(null);
     setAttempt(null);
+    setFollowUpQuestions([]);
     setAnswers({});
     setCurrent(0);
     setRemaining(null);
@@ -73,6 +76,7 @@ export default function StudentQuizPage() {
           if (resume.ok) {
             const state = await resume.json();
             setAttempt(state.attempt);
+            setFollowUpQuestions(state.followUpQuestions || []);
             setIdentity(state.attempt.student);
             setAnswers(Object.fromEntries(Object.entries(state.answers || {}).map(([id, value]) => [id, (value as { answer: string }).answer])));
             setResumeSession(parsed);
@@ -104,6 +108,7 @@ export default function StudentQuizPage() {
       if (!response.ok) throw new Error(data.error);
       const created: Session = data;
       localStorage.setItem(storageKey, JSON.stringify(created));
+      setFollowUpQuestions([]);
       setAttempt({ id: created.attemptId, quizId: created.quizId, student: identity, status: "in_progress", startedAt: created.startedAt, submittedAt: null, progress: { answered: 0, total: payload?.questions.length || 0 }, score: null, correctCount: null, incorrectCount: null, followUp: null, leaveCount: 0 });
       startPlaying(created);
     } catch (startError) { setError(startError instanceof Error ? startError.message : "Sesi tidak dapat dimulai."); }
@@ -145,7 +150,7 @@ export default function StudentQuizPage() {
       const data = await response.json();
       if (response.status === 401) { resetDeletedSession(); return; }
       if (!response.ok) throw new Error(data.error);
-      setSubmitConfirmationOpen(false); setAttempt(data.attempt); setPhase("result");
+      setSubmitConfirmationOpen(false); setAttempt(data.attempt); setFollowUpQuestions(data.followUpQuestions || []); setPhase("result");
     } catch (submitError) { setSubmitConfirmationOpen(false); setError(submitError instanceof Error ? submitError.message : "Jawaban belum dapat dikumpulkan."); submitting.current = false; trackingPaused.current = false; }
     finally { setBusy(false); }
   }, [answers, questions.length, resetDeletedSession, session]);
@@ -183,7 +188,7 @@ export default function StudentQuizPage() {
 
   if (phase === "loading") return <StudentChrome><div className="status-page"><div className="status-card"><LoaderCircle className="spin" size={32} style={{ color: "var(--green)" }} /><p className="muted">Menyiapkan kuis…</p></div></div></StudentChrome>;
   if (phase === "error" || !payload) return <StudentChrome><StatusCard icon={<AlertCircle size={38} />} title="Kuis tidak tersedia" text={error || "Kuis tidak ditemukan atau tautan tidak valid."} tone="error" /></StudentChrome>;
-  if (phase === "result" && attempt) return <StudentChrome><ResultView attempt={attempt} quiz={payload.quiz} /></StudentChrome>;
+  if (phase === "result" && attempt) return <StudentChrome><ResultView attempt={attempt} quiz={payload.quiz} followUpQuestions={followUpQuestions} /></StudentChrome>;
   if (phase === "playing" && session && attempt) {
     const question = questions[current];
     if (!question) return <StudentChrome><StatusCard icon={<FileQuestion size={38} />} title="Soal belum tersedia" text="Guru belum menambahkan soal ke kuis ini." /></StudentChrome>;
@@ -219,7 +224,30 @@ function StatusCard({ icon, title, text, tone = "normal" }: { icon: React.ReactN
   return <div className="status-page"><div className="card status-card rise"><div className="empty-illustration" style={tone === "error" ? { background: "#fae8e4", color: "var(--red)" } : undefined}>{icon}</div><h1>{title}</h1><p className="muted">{text}</p></div></div>;
 }
 
-function ResultView({ attempt, quiz }: { attempt: Attempt; quiz: PublicQuiz }) {
+function ResultView({ attempt, quiz, followUpQuestions }: { attempt: Attempt; quiz: PublicQuiz; followUpQuestions: FollowUpQuestion[] }) {
   const enrichment = attempt.followUp === "PENGAYAAN";
-  return <main className="result-card card rise"><section className="result-hero"><div className="result-icon">{enrichment ? <Trophy size={34} /> : <Sparkles size={34} />}</div><h1>Kuis selesai!</h1><p>Terima kasih, {attempt.student.name}. Jawabanmu sudah tersimpan.</p></section><section className="result-body"><div className="score-ring"><div><strong>{attempt.score}</strong><span>Nilai akhir</span></div></div><div className="result-stats"><div className="result-stat"><strong>{attempt.correctCount}</strong><span>Jawaban benar</span></div><div className="result-stat"><strong>{attempt.incorrectCount}</strong><span>Jawaban salah</span></div><div className="result-stat"><strong>{quiz.passingScore}</strong><span>Batas tuntas</span></div></div><div className={`followup ${enrichment ? "" : "remedial"}`}><span className={`badge ${enrichment ? "badge-enrichment" : "badge-remedial"}`}>{attempt.followUp}</span><p>{enrichment ? "Bagus! Kamu siap melanjutkan ke aktivitas pengayaan." : "Tetap semangat. Pelajari kembali bagian yang belum dikuasai, lalu ikuti remedial."}</p></div><div className="reflection"><strong>Langkah berikutnya</strong><br />Catat pada buku tulis bagian materi yang masih perlu dipelajari serta rencana yang akan dilakukan untuk memperbaiki atau mengembangkan pemahaman.</div></section></main>;
+  const [creatingPdf, setCreatingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState("");
+
+  async function downloadPdf() {
+    if (creatingPdf || !followUpQuestions.length) return;
+    setCreatingPdf(true);
+    setPdfError("");
+    try {
+      const [pdfMakeModule, fontsModule] = await Promise.all([
+        import("pdfmake/build/pdfmake.js"),
+        import("pdfmake/build/vfs_fonts.js"),
+      ]);
+      const pdfMake = pdfMakeModule.default;
+      pdfMake.addVirtualFileSystem(fontsModule.default);
+      const input = { attempt, quiz, questions: followUpQuestions };
+      await pdfMake.createPdf(buildFollowUpPdfDefinition(input)).download(followUpPdfFileName(input));
+    } catch {
+      setPdfError("PDF belum dapat dibuat. Silakan coba lagi.");
+    } finally {
+      setCreatingPdf(false);
+    }
+  }
+
+  return <main className="result-card card rise"><section className="result-hero"><div className="result-icon">{enrichment ? <Trophy size={34} /> : <Sparkles size={34} />}</div><h1>Kuis selesai!</h1><p>Terima kasih, {attempt.student.name}. Jawabanmu sudah tersimpan.</p></section><section className="result-body"><div className="score-ring"><div><strong>{attempt.score}</strong><span>Nilai akhir</span></div></div><div className="result-stats"><div className="result-stat"><strong>{attempt.correctCount}</strong><span>Jawaban benar</span></div><div className="result-stat"><strong>{attempt.incorrectCount}</strong><span>Jawaban salah</span></div><div className="result-stat"><strong>{quiz.passingScore}</strong><span>Batas tuntas</span></div></div><div className={`followup ${enrichment ? "" : "remedial"}`}><span className={`badge ${enrichment ? "badge-enrichment" : "badge-remedial"}`}>{attempt.followUp}</span><p>{enrichment ? "Bagus! Kamu siap melanjutkan ke aktivitas pengayaan." : "Tetap semangat. Pelajari kembali bagian yang belum dikuasai, lalu ikuti remedial."}</p></div>{followUpQuestions.length > 0 && <div className={`result-download ${enrichment ? "enrichment" : "remedial"}`}><div className="result-download-icon"><FileQuestion size={22} /></div><div><strong>Soal uraian {enrichment ? "pengayaan" : "remedial"} siap</strong><span>{followUpQuestions.length} soal akan dibuat menjadi PDF</span></div><button className="btn btn-primary" type="button" disabled={creatingPdf} onClick={downloadPdf}>{creatingPdf ? <LoaderCircle className="spin" size={17} /> : <Download size={17} />}{creatingPdf ? "Membuat PDF..." : "Unduh PDF"}</button></div>}{pdfError && <div className="error-box result-pdf-error">{pdfError}</div>}<div className="reflection"><strong>Langkah berikutnya</strong><br />{followUpQuestions.length ? "Unduh PDF dan kerjakan soal uraian tindak lanjut yang sudah disiapkan guru. Catat juga bagian materi yang masih perlu dipelajari atau dikembangkan." : "Catat pada buku tulis bagian materi yang masih perlu dipelajari serta rencana yang akan dilakukan untuk memperbaiki atau mengembangkan pemahaman."}</div></section></main>;
 }

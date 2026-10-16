@@ -1,7 +1,14 @@
 export type QuizStatus = "draft" | "active" | "closed";
 export type AttemptStatus = "registered" | "in_progress" | "submitted" | "expired";
 export type FollowUp = "REMEDIAL" | "PENGAYAAN" | null;
+export type FollowUpCategory = Exclude<FollowUp, null>;
 export type AnswerKey = "A" | "B" | "C" | "D" | "E";
+
+export interface FollowUpQuestion {
+  id: string;
+  text: string;
+  order: number;
+}
 
 export interface Quiz {
   id: string;
